@@ -170,7 +170,6 @@ def get_vacancies_hh(languages):
 
                 all_vacancies.extend(vacancies.get("items"))
             if page >= vacancies.get("pages"):
-            # if page >= 10:
                 found = vacancies.get("found")
                 break
 
