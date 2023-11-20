@@ -3,10 +3,11 @@ import requests
 from dotenv import load_dotenv
 from itertools import count
 from terminaltables import AsciiTable
+from contextlib import suppress
 
 
-def print_table_data(data, title=""):
-    table_data = [
+def print_table(data, title=""):
+    vacancies_data = [
         [
             "Language",
             "Vacancies found",
@@ -15,12 +16,12 @@ def print_table_data(data, title=""):
         ]
     ]
 
-    for key, value in data.items():
-        line = [key]
-        line.extend(value.values())
-        table_data.append(line)
+    for language, language_info in data.items():
+        line = [language]
+        line.extend(language_info.values())
+        vacancies_data.append(line)
 
-    table = AsciiTable(table_data, title)
+    table = AsciiTable(vacancies_data, title)
     print(table.table)
 
 
@@ -35,14 +36,14 @@ def predict_salary(salary_from, salary_to):
         return salary_to * 0.8
 
 
-def get_vacancies_superjob(api_token, language="", page=0):
+def get_vacancies_superjob(api_token, language="", page=0, town_id=4):
     headers = {
         "X-Api-App-Id": f"{api_token}",
     }
 
     params = {
         "keyword": f"{language}",
-        "town": 4,
+        "town": town_id,
         "page": page,
     }
 
@@ -53,39 +54,38 @@ def get_vacancies_superjob(api_token, language="", page=0):
     return response.json()
 
 
-def get_vacancies_information_sj(api_token, languages):
-    vacancies_info = {}
+def get_vacancies_sj(api_token, languages):
+    vacancies_average = {}
 
     for language in languages:
         salaries = []
         found = 0
-        vacancies_all = []
+        all_vacancies = []
         for page in count(0):
             vacancies = get_vacancies_superjob(
                 api_token,
                 language=language,
                 page=page
             )
-            vacancies_all.extend(vacancies.get("objects"))
+            all_vacancies.extend(vacancies.get("objects"))
             if not vacancies.get("more"):
                 found = vacancies.get("total")
                 break
 
-        for vacancy in vacancies_all:
+        for vacancy in all_vacancies:
             salary = predict_rub_salary_for_superjob(vacancy)
             if salary:
                 salaries.append(salary)
         predicted_salary = 0
         if salaries:
             predicted_salary = int(sum(salaries) / len(salaries))
-        info = {
+        vacancies_average[language] = {
             "vacancies_found": found,
             "vacancies_processed": len(salaries),
             "average_salary": predicted_salary,
         }
-        vacancies_info[language] = info
 
-    return vacancies_info
+    return vacancies_average
 
 
 def predict_rub_salary_for_superjob(vacancy):
@@ -95,7 +95,7 @@ def predict_rub_salary_for_superjob(vacancy):
     return predict_salary(salary_from, salary_to)
 
 
-def get_vacancies(language="", page=0):
+def get_vacancies(language="", page=0, city_id=1, period_days=30, per_page=20):
 
     headers = {
         "User-Agent": "MyApp / 1.0(my - app - feedback @ example.com)"
@@ -103,9 +103,9 @@ def get_vacancies(language="", page=0):
 
     params = {
         "text": f"программист {language}",
-        "id": 1,
-        "period": 30,
-        "per_page": 20,
+        "id": city_id,
+        "period": period_days,
+        "per_page": per_page,
         "page": page,
     }
 
@@ -158,24 +158,23 @@ def predict_rub_salary_for_hh(vacancy):
     )
 
 
-def get_vacancies_information(languages):
-    vacancies_information = {}
+def get_vacancies_hh(languages):
+    vacancies_average = {}
     for language in languages:
         found = 0
         salaries = []
-        vacancies_all = []
+        all_vacancies = []
         for page in count(0):
-            try:
+            with suppress(requests.exceptions.HTTPError):
                 vacancies = get_vacancies(language, page=page)
 
-                vacancies_all.extend(vacancies.get("items"))
-            except requests.exceptions.HTTPError:
-                pass
-            if page >= 10:
+                all_vacancies.extend(vacancies.get("items"))
+            if page >= vacancies.get("pages"):
+            # if page >= 10:
                 found = vacancies.get("found")
                 break
 
-        for vacancy in vacancies_all:
+        for vacancy in all_vacancies:
             salary = predict_rub_salary_for_hh(vacancy)
             if salary:
                 salaries.append(salary)
@@ -184,14 +183,13 @@ def get_vacancies_information(languages):
         if salaries:
             predicted_salary = int(sum(salaries) / len(salaries))
 
-        info = {
+        vacancies_average[language] = {
             "vacancies_found": found,
             "vacancies_processed": len(salaries),
             "average_salary": predicted_salary,
         }
-        vacancies_information[language] = info
 
-    return vacancies_information
+    return vacancies_average
 
 
 def main():
@@ -211,10 +209,10 @@ def main():
         "C",
     ]
 
-    print_table_data(get_vacancies_information(languages), title="HH Moscow")
+    print_table(get_vacancies_hh(languages), title="HH Moscow")
 
-    print_table_data(
-        get_vacancies_information_sj(
+    print_table(
+        get_vacancies_sj(
             super_job_token,
             languages
         ),
