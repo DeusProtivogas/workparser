@@ -2,10 +2,22 @@
 A set of scripts to parse vacancies on websites HeadHunter and SuperJob and to output them in an easy readable manner.
 
 ### Environment variables
-- SUPER_JOB_TOKEN
+- SUPER_JOB_TOKEN - Api token from SuperJob website.
 
 1. Put `.env` file near `main.py`.
 2. `.env` contains text data without quotes.
+
+### Installation
+To install necessary dependencies:
+```
+pip install -r requirements.txt
+```
+
+### Running
+To run the program:
+```
+python3 main.py
+```
 
 ## Table print
 
